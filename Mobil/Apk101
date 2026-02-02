@@ -1,0 +1,397 @@
+# Apk101 - Mobil Challenge
+
+## Platform
+CTF Yarışması
+
+## Zorluk
+⭐ Kolay
+
+## Kategori
+Mobile (Android)
+
+## Puan
+200 (+50 Firstblood)
+
+## Challenge Dosyası
+**📥 Google Drive - Mobil101.apk**
+
+## Kullanılan Araçlar
+- file (Dosya analizi)
+- unzip (APK extraction)
+- strings (String extraction)
+- grep (Text arama & regex)
+
+## Çözüm
+
+### 1. Dosya Analizi
+APK dosyasını indirip kontrol ettim:
+
+```bash
+file Mobil101.apk
+```
+
+**Çıktı:**
+```
+Mobil101.apk: Android package (APK), with APK Signing Block
+```
+
+✅ **Android APK dosyası doğrulandı!**
+
+### 2. APK İçeriğini İnceleme
+APK dosyası aslında bir ZIP arşivi:
+
+```bash
+unzip Mobil101.apk -d Mobil101_extracted
+cd Mobil101_extracted
+ls -la
+```
+
+**Çıktı:**
+```
+AndroidManifest.xml
+classes.dex
+classes2.dex
+resources.arsc
+res/
+META-INF/
+```
+
+**Analiz:**
+- 📄 AndroidManifest.xml: Uygulama yapılandırması
+- 🔢 classes.dex: Derlenmiş Java/Kotlin kodu
+- 📊 resources.arsc: Uygulama kaynakları
+
+### 3. İlk String Analizi
+Önce grep ile binary dosyalarda flag aradım:
+
+```bash
+grep -r "flag" .
+grep -r "CTF" .
+```
+
+**Çıktı:**
+```
+grep: ./classes.dex: binary file matches
+grep: ./resources.arsc: binary file matches
+grep: ./classes2.dex: binary file matches
+```
+
+💡 **Binary dosyalarda "flag" ve "CTF" kelimelerini buldu ama içeriği göremiyoruz!**
+
+### 4. Detaylı String Extraction
+strings komutu ile APK'dan tüm text verilerini çıkardım:
+
+```bash
+strings ../Mobil101.apk | grep -i "flag\|ctf"
+```
+
+**İlk çıktı:**
+```
+behavior_saveFlags
+defaultScrollFlagsEnabled
+layout_scrollFlags
+nestedScrollFlags
+transitionFlags
+flag
+&CtFGrQR
+CtFz
+XI*cTf
+```
+
+**Analiz:**
+- İlk satırlar Android framework string'leri (işimize yaramıyor)
+- `&CtFGrQR`, `CtFz`, `XI*cTf` → Şüpheli parçalar!
+- 🤔 Bunlar flag'in parçaları olabilir mi?
+
+### 5. Flag Format Arama
+CTF flag'leri genelde `flag{...}` veya `Flag{...}` formatındadır:
+
+```bash
+strings ../Mobil101.apk | grep -E "(CTF|ctf|flag|Flag|FLAG)\{"
+```
+
+**Sonuç:**
+```
+(Boş - Direkt flag formatı yok)
+```
+
+Daha geniş regex pattern denedim:
+
+```bash
+strings ../Mobil101.apk | grep -E "^[A-Za-z0-9_]*\{.*\}$"
+```
+
+**Çıktı:**
+```
+P85{}
+{:OJJg}
+SKYDAYS{buyukhocaya}
+{jP3}
+3G{}
+Lz{/p}
+w{4}
+{<C}
+g{5m}
+e{(}
+{6t\}
+bk{}
+{JO}
+l{yC&}
+{Srq~}
+Yf{}
+```
+
+🚩 **FLAG BULUNDU!**
+
+### 6. Flag Doğrulama
+**Bulduk:**
+```
+SKYDAYS{buyukhocaya}
+```
+
+**Format analizi:**
+- ✅ SKYDAYS - CTF organizasyonu/platform adı
+- ✅ {buyukhocaya} - Flag içeriği (Türkçe: "büyük hocaya")
+- ✅ Süslü parantez formatı doğru
+
+**Diğer satırlar:**
+- `P85{}`, `3G{}`, `bk{}` → Boş süslü parantezler (framework kodu)
+- `{:OJJg}`, `{jP3}` → Random stringler (flag değil)
+- Sadece `SKYDAYS{buyukhocaya}` anlamlı ve flag formatına uyuyor!
+
+## Flag
+```
+SKYDAYS{buyukhocaya}
+```
+
+## Çözüm Akışı
+```
+📱 "Mobil101" Challenge
+            ↓
+📥 Mobil101.apk indirildi
+            ↓
+📄 file Mobil101.apk → Android APK
+            ↓
+📦 unzip → classes.dex, resources.arsc bulundu
+            ↓
+🔍 grep -r "flag" → Binary dosyalarda match
+            ↓
+🔤 strings Mobil101.apk → Text extraction
+            ↓
+🔎 grep -i "flag\|ctf" → Şüpheli parçalar görüldü
+            ↓
+🎯 grep -E "^[A-Za-z0-9_]*\{.*\}$" → Regex pattern
+            ↓
+📝 SKYDAYS{buyukhocaya} bulundu!
+            ↓
+🚩 FLAG: SKYDAYS{buyukhocaya}
+```
+
+## Kullanılan Komutlar
+```bash
+# Dosya analizi
+file Mobil101.apk
+
+# APK extraction
+unzip Mobil101.apk -d Mobil101_extracted
+cd Mobil101_extracted
+
+# Binary dosyalarda flag arama
+grep -r "flag" .
+grep -r "CTF" .
+
+# String extraction ve flag bulma
+strings ../Mobil101.apk | grep -i "flag\|ctf"
+
+# Flag format regex ile arama
+strings ../Mobil101.apk | grep -E "^[A-Za-z0-9_]*\{.*\}$"
+```
+
+## Teknik Detaylar
+
+### strings Komutu
+`strings` komutu, binary dosyalardaki okunabilir text string'leri extract eder:
+
+**Kullanım:**
+```bash
+strings [options] <file>
+
+# Minimum string length belirt
+strings -n 10 file.apk
+
+# Encoding belirt
+strings -e l file.apk  # little-endian
+strings -e b file.apk  # big-endian
+```
+
+**Nasıl çalışır:**
+- Binary dosyayı byte-by-byte okur
+- Printable ASCII karakterleri arar
+- Minimum 4 karakter uzunluğunda sequence'ler bulur
+- Default: ASCII, UTF-8 desteği ile
+
+### Regex Pattern Açıklama
+```bash
+grep -E "^[A-Za-z0-9_]*\{.*\}$"
+```
+
+**Pattern breakdown:**
+- `^` : Satır başı
+- `[A-Za-z0-9_]*` : Flag prefix (SKYDAYS, CTF, FLAG vb.)
+- `\{` : Açık süslü parantez (escaped)
+- `.*` : Herhangi bir karakter, any length
+- `\}` : Kapalı süslü parantez (escaped)
+- `$` : Satır sonu
+
+**Örnek matches:**
+- ✅ `SKYDAYS{buyukhocaya}`
+- ✅ `FLAG{test123}`
+- ✅ `CTF{example}`
+- ❌ `{only_content}` (prefix yok)
+- ❌ `PREFIX{no_closing` (closing brace yok)
+
+### APK İçinde Flag Saklama Yöntemleri
+1. **Hardcoded strings**: Kaynak kodda direkt string (bu challenge)
+2. **Resources**: strings.xml, colors.xml vb.
+3. **Assets**: Ayrı dosyalar
+4. **Native libraries**: .so dosyalarında
+5. **Encrypted**: Şifreli format
+6. **Obfuscated**: Karmaşıklaştırılmış
+
+## Öğrenilenler
+- APK string extraction teknikleri
+- Regex pattern matching
+- grep ile etkili arama
+- Android APK yapısı
+- Binary dosya analizi
+- Flag format recognition
+
+## Notlar
+Bu "101" seviyesinde bir mobile challenge - APK analizi için temel beceriler. Flag direkt olarak string'lerde hardcoded, herhangi bir decompilation veya advanced analysis gerektirmiyor.
+
+Challenge adı "Apk101" - Android APK analizi için 101 (beginner) seviyesi. `strings` komutu ve regex ile flag bulunabiliyor.
+
+## İpuçları
+- APK'larda flag ararken önce `strings` komutunu dene
+- Regex pattern'ler flag formatını bulmak için çok etkili
+- `grep -E` extended regex desteği sağlar
+- Flag format genelde organizasyona göre değişir (SKYDAYS, CTF, FLAG vb.)
+- Binary dosyalarda direkt `grep` çalışmaz, önce `strings` kullan
+
+## Alternatif Çözüm Yöntemleri
+
+### 1. Apktool ile Decompile
+```bash
+apktool d Mobil101.apk -o Mobil101_decoded
+grep -r "SKYDAYS" Mobil101_decoded/
+```
+
+### 2. JADX ile Java Kodu
+```bash
+jadx Mobil101.apk -d Mobil101_jadx
+grep -r "SKYDAYS" Mobil101_jadx/
+```
+
+### 3. Online APK Analyzer
+- Upload APK to online tools
+- Search for strings
+- Example: appetize.io, APK Analyzer websites
+
+### 4. Python Script
+```python
+import zipfile
+import re
+
+with zipfile.ZipFile('Mobil101.apk', 'r') as apk:
+    for file in apk.namelist():
+        try:
+            content = apk.read(file).decode('utf-8', errors='ignore')
+            flags = re.findall(r'[A-Za-z0-9_]+\{[^}]+\}', content)
+            for flag in flags:
+                if 'SKYDAYS' in flag or 'FLAG' in flag:
+                    print(f"Found: {flag}")
+        except:
+            pass
+```
+
+### 5. Android Studio APK Analyzer
+```
+1. Open Android Studio
+2. Build → Analyze APK
+3. Select Mobil101.apk
+4. Browse classes.dex
+5. Search for strings
+```
+
+## grep Komutları Cheat Sheet
+```bash
+# Case-insensitive search
+grep -i "pattern" file
+
+# Recursive search
+grep -r "pattern" directory
+
+# Extended regex
+grep -E "pattern" file
+
+# Multiple patterns (OR)
+grep -E "pattern1|pattern2" file
+
+# Show line numbers
+grep -n "pattern" file
+
+# Show only matching part
+grep -o "pattern" file
+
+# Invert match (show non-matching lines)
+grep -v "pattern" file
+
+# Count matches
+grep -c "pattern" file
+
+# Context (show surrounding lines)
+grep -A 2 -B 2 "pattern" file  # 2 lines after and before
+```
+
+## Regex Cheat Sheet
+```
+^       : Start of line
+$       : End of line
+.       : Any single character
+*       : 0 or more repetitions
++       : 1 or more repetitions
+?       : 0 or 1 repetition
+[abc]   : Any character in set
+[^abc]  : Any character NOT in set
+[a-z]   : Any character in range
+\       : Escape special character
+|       : OR operator
+()      : Grouping
+{n}     : Exactly n repetitions
+{n,}    : n or more repetitions
+{n,m}   : Between n and m repetitions
+```
+
+## Neden Kolay?
+Bu challenge kolay çünkü:
+1. ✅ Flag direkt string'lerde (hardcoded)
+2. ✅ Encryption/obfuscation yok
+3. ✅ Decompilation gerek yok
+4. ✅ `strings` komutu yeterli
+5. ✅ Flag format belirgin (SKYDAYS{...})
+
+Daha zor versiyonlar:
+- Flag şifreli olabilir
+- Multiple part flag (birleştirme gerekir)
+- Native library'de gizli
+- Runtime'da generate ediliyor
+- Anti-debugging teknikleri
+
+## Security Best Practices
+Bu challenge'dan öğrenilen güvenlik prensipleri:
+1. ❌ Hardcoded secrets APK'da
+2. ❌ Plaintext sensitive data
+3. ✅ ProGuard/R8 obfuscation kullan
+4. ✅ Encryption ile gizle
+5. ✅ Server-side validation
+6. ✅ Runtime security checks
