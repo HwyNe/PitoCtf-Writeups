@@ -1,0 +1,89 @@
+GamerlarNerde Writeup
+[Medium] [Reverse] | Date: 2026-02-04
+Challenge Bilgileri
+Kategori: Reverse Engineering
+CTF: bi0sCTF
+Flag: bi0sCTF{GG!_H4X_FOR_TH3_WIN}
+Challenge Açıklaması
+Hilecileri hiç sevmem :(
+
+İPUCU: Cheatengine'e gerek yoktur belki? Kaynak kodları değiştir ve uçmayı öğren.
+
+Analiz
+1. Dosya Yapısını İnceleme
+Challenge dosyalarına baktığımızda bunun bir Unity oyunu olduğunu görüyoruz:
+
+GamerlarNerde/
+├── chall.exe                 # Ana oyun executable
+├── Chall_Data/
+│   ├── Managed/
+│   │   ├── Assembly-CSharp.dll   # ← Oyun mantığı burada!
+│   │   └── ...
+│   └── ...
+├── MonoBleedingEdge/
+├── UnityCrashHandler64.exe
+└── UnityPlayer.dll
+Unity oyunları .NET/Mono tabanlıdır ve Assembly-CSharp.dll dosyası oyunun C# kaynak kodunu derlenmiş halde içerir.
+
+2. Decompile İşlemi
+dnSpy kullanarak Chall_Data/Managed/Assembly-CSharp.dll dosyasını açtık.
+
+Önemli class'lar:
+
+Platformer.Mechanics.KinematicObject - Fizik/yerçekimi kontrolü
+Platformer.Mechanics.PlayerController - Oyuncu hareketi
+3. Yerçekimi Kodunu Bulma
+KinematicObject class'ındaki FixedUpdate metodunu incelediğimizde:
+
+protected virtual void FixedUpdate()
+{
+    if (this.velocity.y < 0f)
+    {
+        this.velocity += this.gravityModifier * Physics2D.gravity * Time.deltaTime;
+    }
+    else
+    {
+        this.velocity += Physics2D.gravity * Time.deltaTime;
+    }
+    // ... hareket kodu
+}
+Bu kod oyuncuya yerçekimi uyguluyor ve sürekli aşağı düşmemize neden oluyor.
+
+4. Kodu Değiştirme (Patch)
+İpucunda "uçmayı öğren" deniyor. Bunu yapmak için dnSpy ile yerçekimi kodunu devre dışı bıraktık:
+
+dnSpy'da KinematicObject → FixedUpdate metoduna sağ tıkla
+Edit Method (C#) seç
+Metodu şu şekilde değiştir:
+protected virtual void FixedUpdate()
+{
+    // Yerçekimi input ile kontrol - WASD/Arrow keys ile uçma
+    float horizontal = Input.GetAxis("Horizontal");
+    float vertical = Input.GetAxis("Vertical");
+    
+    this.velocity.x = horizontal * 7f;
+    this.velocity.y = vertical * 7f;
+    
+    this.IsGrounded = false;
+    
+    Vector2 move = this.velocity * Time.deltaTime;
+    this.body.position = this.body.position + move;
+}
+Compile butonuna tıkla
+File → Save Module ile kaydet
+5. Flag'i Bulma
+Değişiklikleri kaydettikten sonra oyunu çalıştırdık (chall.exe).
+
+Artık W/S veya Yukarı/Aşağı ok tuşları ile uçabiliyoruz!
+
+Haritanın üst kısmına uçtuğumuzda, normalde ulaşılamayan bir bölgede flag yazılı:
+
+Flag
+bi0sCTF{GG!_H4X_FOR_TH3_WIN}
+Kullanılan Araçlar
+Araç	Kullanım Amacı
+dnSpy	.NET DLL decompile ve edit
+Öğrenilen Teknikler
+Unity oyun yapısı - Assembly-CSharp.dll dosyasının önemi
+.NET Reverse Engineering - dnSpy ile decompile ve patch
+Game Hacking - Fizik motorunu manipüle ederek "uçma" özelliği ekleme
